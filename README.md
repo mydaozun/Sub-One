@@ -264,7 +264,7 @@ docker run -d \
 - **数据持久化**: 请务必挂载 `/app/data` 目录，否则容器重启后您的订阅数据将会丢失。
 - **适配器说明**: Docker 版本内置了 Node.js 适配服务器 (`docker/docker-server.ts`)，完美模拟 Cloudflare 环境。
 
-### 🌐 Cloudflare Pages 部署
+## 🌐 Cloudflare Pages 部署
 
 本项目专为Cloudflare Pages设计，支持一键部署。
 
