@@ -135,11 +135,13 @@ function mapSurgeParams(proxy: Partial<ProxyNode>, params: Record<string, string
     if (params.psk) proxy.password = params.psk;
     if (params['encrypt-method']) proxy.cipher = params['encrypt-method'];
 
-    // TLS
-    proxy.tls = params.tls === 'true' || proxy.type === 'https' || !!params.sni;
+    // TLS - anytls 协议始终使用 TLS
+    proxy.tls = params.tls === 'true' || proxy.type === 'https' || proxy.type === 'anytls';
     if (params.sni) proxy.sni = params.sni;
     if (params['skip-cert-verify'])
         proxy['skip-cert-verify'] = params['skip-cert-verify'] === 'true';
+    if (params['server-cert-fingerprint-sha256'])
+        proxy['tls-fingerprint'] = params['server-cert-fingerprint-sha256'];
     if (params['client-fingerprint']) proxy['client-fingerprint'] = params['client-fingerprint'];
 
     // TCP / UDP / TFO
@@ -166,16 +168,40 @@ function mapSurgeParams(proxy: Partial<ProxyNode>, params: Record<string, string
     switch (proxy.type) {
         case 'vmess':
             proxy.uuid = params.username;
-            if (params.version) proxy.alterId = parseInt(params.version, 10);
+            proxy.alterId = 0; // Surge 始终使用 AEAD 模式
             break;
         case 'vless':
             proxy.uuid = params.username;
             break;
         case 'tuic':
-            proxy.uuid = params.username; // Surge format often uses username as uuid
+            proxy.uuid = params.username;
+            if (params['congestion-controller'])
+                proxy['congestion-controller'] = params['congestion-controller'];
+            if (params['udp-relay-mode']) proxy['udp-relay-mode'] = params['udp-relay-mode'];
+            if (params['reduce-rtt'] === 'true') proxy['reduce-rtt'] = true;
+            break;
+        case 'hysteria2':
+            // password 已由通用逻辑处理
+            if (params.up) proxy.up = params.up;
+            if (params.down) proxy.down = params.down;
             break;
         case 'snell':
             if (params.version) proxy.version = parseInt(params.version, 10);
+            break;
+        case 'anytls':
+            // AnyTLS session 相关参数
+            if (params['idle-session-check-interval']) {
+                const v = parseInt(params['idle-session-check-interval'], 10);
+                if (!isNaN(v)) proxy['idle-session-check-interval'] = v;
+            }
+            if (params['idle-session-timeout']) {
+                const v = parseInt(params['idle-session-timeout'], 10);
+                if (!isNaN(v)) proxy['idle-session-timeout'] = v;
+            }
+            if (params['max-stream-count']) {
+                const v = parseInt(params['max-stream-count'], 10);
+                if (!isNaN(v)) proxy['max-stream-count'] = v;
+            }
             break;
         case 'external':
             proxy.exec = params.exec;

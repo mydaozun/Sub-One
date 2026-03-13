@@ -173,12 +173,16 @@ export interface ProxyNode {
     'recv-window'?: number; // 接收窗口
     'recv-window-conn'?: number; // 连接接收窗口
     'disable-mtu-discovery'?: boolean; // 禁用MTU发现
+    'hop-interval'?: string | number; // 端口跳跃间隔 (Hysteria2)
+    'heartbeat-interval'?: number; // 心跳间隔 (TUIC)
 
     // === TUIC 特有 ===
     token?: string; // TUIC token
     'congestion-controller'?: string; // 拥塞控制
     'udp-relay-mode'?: string; // UDP中继模式
     'reduce-rtt'?: boolean; // 减少RTT
+    'disable-sni'?: boolean; // 禁用 SNI (TUIC)
+    'udp-over-stream'?: boolean; // UDP over Stream (TUIC)
     'request-timeout'?: number; // 请求超时
     'max-udp-relay-packet-size'?: number;
     'max-open-streams'?: number; // 最大打开流数
@@ -193,16 +197,27 @@ export interface ProxyNode {
     preSharedKey?: string; // 别名 (兼容旧版)
     reserved?: string | number[]; // 保留字段
     mtu?: number; // MTU
-    ip?: string; // IPv4地址
+    dns?: string | string[]; // DNS 服务器 (WireGuard)
+    'allowed-ips'?: string[]; // 允许的 IP 段 (WireGuard top-level)
     ipv6?: string; // IPv6地址
     peers?: Array<{
         // WireGuard peers
+        server?: string;
+        port?: number;
         endpoint?: string;
         'public-key'?: string;
         'pre-shared-key'?: string;
         'allowed-ips'?: string[];
+        allowed_ips?: string[];
         reserved?: string | number[];
     }>;
+
+    // === AnyTLS 特有 ===
+    'idle-session-check-interval'?: number; // 空闲会话检测间隔 (秒)
+    'idle-session-timeout'?: number; // 空闲会话超时 (秒)
+    'min-idle-session'?: number; // 最小空闲会话数
+    'max-stream-count'?: number; // 最大流数量
+    'tls-pubkey-sha256'?: string; // TLS 公钥 SHA256
 
     // === Snell 特有 ===
     version?: number; // Snell 版本
@@ -285,7 +300,8 @@ export interface ProcessOptions {
 
 export interface ConvertOptions {
     filename?: string; // 文件名
-    'include-unsupported-proxy'?: boolean; // 是否包含不支持的代理
+    'include-unsupported-proxy'?: boolean; // 是否包含不支持的代理 (kebab-case)
+    includeUnsupportedProxy?: boolean; // 是否包含不支持的代理 (camelCase)
     useMihomoExternal?: boolean; // 是否使用 Mihomo External
     [key: string]: any; // 其他平台特定选项
 }

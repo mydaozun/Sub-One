@@ -957,15 +957,44 @@ export function parseAnyTLS(uri: string): ProxyNode | null {
         const params: Record<string, string> = {};
         for (const addon of query.split('&')) {
             if (addon) {
-                const [key, valueRaw] = addon.split('=');
-                params[key] = decodeURIComponent(valueRaw || '');
+                const eqIdx = addon.indexOf('=');
+                if (eqIdx > 0) {
+                    const key = addon.substring(0, eqIdx).replace(/_/g, '-');
+                    const value = decodeURIComponent(addon.substring(eqIdx + 1));
+                    params[key] = value;
+                }
             }
         }
 
-        proxy.sni = params.sni;
-        proxy['client-fingerprint'] = params.fp || params.fingerprint;
-        if (params.idle_timeout) {
-            proxy.idleTimeout = parseInt(params.idle_timeout, 10);
+        if (params.sni) proxy.sni = params.sni;
+        if (params.fp || params.fingerprint) {
+            proxy['client-fingerprint'] = params.fp || params.fingerprint;
+        }
+        if (params.alpn) {
+            proxy.alpn = params.alpn ? params.alpn.split(',') : undefined;
+        }
+        if (params.insecure) {
+            proxy['skip-cert-verify'] = /(true)|1/i.test(params.insecure);
+        }
+        if (params.udp) {
+            proxy.udp = /(true)|1/i.test(params.udp);
+        }
+        // Session 相关参数
+        if (params['idle-session-check-interval']) {
+            const v = parseInt(params['idle-session-check-interval'], 10);
+            if (!isNaN(v)) proxy['idle-session-check-interval'] = v;
+        }
+        if (params['idle-session-timeout'] || params['idle-timeout']) {
+            const v = parseInt(params['idle-session-timeout'] || params['idle-timeout'], 10);
+            if (!isNaN(v)) proxy['idle-session-timeout'] = v;
+        }
+        if (params['min-idle-session']) {
+            const v = parseInt(params['min-idle-session'], 10);
+            if (!isNaN(v)) proxy['min-idle-session'] = v;
+        }
+        if (params['max-stream-count']) {
+            const v = parseInt(params['max-stream-count'], 10);
+            if (!isNaN(v)) proxy['max-stream-count'] = v;
         }
 
         return proxy as ProxyNode;

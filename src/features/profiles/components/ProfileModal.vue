@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import Modal from '../../../components/ui/BaseModal.vue';
+import Modal from '../../../shared/components/ui/BaseModal.vue';
 import type { Node, Profile, Subscription } from '../../../types/index';
 import { filterNodes } from '../../../utils/search';
 import { generateShortId } from '../../../utils/utils';
@@ -33,6 +33,7 @@ const props = withDefaults(
         allManualNodes?: Node[];
     }>(),
     {
+        profile: null,
         isNew: false,
         allSubscriptions: () => [],
         allManualNodes: () => []
@@ -476,3 +477,4 @@ const handleDeselectAll = (
         </template>
     </Modal>
 </template>
+

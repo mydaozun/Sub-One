@@ -65,6 +65,16 @@ export class StashConverter extends ClashConverter {
 
         if (proxy.type === 'snell' && (proxy.version ?? 0) >= 4) return false;
 
+        // AnyTLS 不支持非 tcp 传输层或 reality
+        if (
+            proxy.type === 'anytls' &&
+            proxy.network &&
+            (!['tcp'].includes(proxy.network) ||
+                (['tcp'].includes(proxy.network) && proxy['reality-opts']))
+        ) {
+            return false;
+        }
+
         return true;
     }
 

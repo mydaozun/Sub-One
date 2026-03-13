@@ -192,12 +192,14 @@ export class URIConverter extends BaseConverter {
         if (node.tfo) params.set('fastopen', '1');
         if (node.ports) params.set('mport', String(node.ports));
         if (node['tls-fingerprint']) params.set('pinSHA256', node['tls-fingerprint']);
+        if (node['hop-interval']) params.set('hop-interval', String(node['hop-interval']));
+        if (node.keepalive) params.set('keepalive', String(node.keepalive));
 
         let queryString = params.toString();
         if (queryString) queryString = '?' + queryString;
 
         const hash = node.name ? `#${encodeURIComponent(String(node.name))}` : '';
-        return `hy2://${encodeURIComponent(node.password || '')}@${node.server}:${node.port}${queryString}${hash}`;
+        return `hysteria2://${encodeURIComponent(node.password || '')}@${node.server}:${node.port}${queryString}${hash}`;
     }
 
     private tuic(node: ProxyNode): string {
@@ -208,6 +210,9 @@ export class URIConverter extends BaseConverter {
         if (node.tfo) params.set('fast_open', '1');
         if (node['congestion-controller'])
             params.set('congestion_control', node['congestion-controller']);
+        if (node['disable-sni']) params.set('disable_sni', '1');
+        if (node['reduce-rtt']) params.set('reduce_rtt', '1');
+        if (node['udp-relay-mode']) params.set('udp_relay_mode', node['udp-relay-mode']);
 
         let queryString = params.toString();
         if (queryString) queryString = '?' + queryString;
@@ -218,15 +223,23 @@ export class URIConverter extends BaseConverter {
     private wireguard(node: ProxyNode): string {
         const params = new URLSearchParams();
         params.set('publickey', node['public-key'] || node.publicKey || '');
-        if (node.ip) params.set('address', node.ip);
+        // 地址带 CIDR 后缀，同时支持 IPv4 + IPv6
+        const addresses: string[] = [];
+        if (node.ip) addresses.push(`${node.ip}/32`);
+        if (node.ipv6) addresses.push(`${node.ipv6}/128`);
+        if (addresses.length) params.set('address', addresses.join(','));
         if (node.mtu) params.set('mtu', String(node.mtu));
         const psk = node['pre-shared-key'] || node['preshared-key'];
         if (psk) params.set('presharedkey', psk);
+        if (node.reserved) {
+            const res = Array.isArray(node.reserved) ? node.reserved.join(',') : node.reserved;
+            params.set('reserved', String(res));
+        }
 
         let queryString = params.toString();
         if (queryString) queryString = '?' + queryString;
         const hash = node.name ? `#${encodeURIComponent(String(node.name))}` : '';
-        return `wireguard://${node['private-key'] || node.privateKey}@${node.server}:${node.port}${queryString}${hash}`;
+        return `wireguard://${encodeURIComponent(node['private-key'] || node.privateKey || '')}@${node.server}:${node.port}${queryString}${hash}`;
     }
 
     private socks5(node: ProxyNode): string {
@@ -246,11 +259,23 @@ export class URIConverter extends BaseConverter {
 
     private anytls(node: ProxyNode): string {
         const params = new URLSearchParams();
-        this.appendVLESSParams(params, { ...node, uuid: node.password });
+        if (node.sni) params.set('sni', node.sni);
+        if (node['client-fingerprint']) params.set('fp', node['client-fingerprint']);
+        if (node.alpn) params.set('alpn', Array.isArray(node.alpn) ? node.alpn[0] : node.alpn);
+        if (node['skip-cert-verify']) params.set('insecure', '1');
+        if (node.udp) params.set('udp', '1');
+        if (node['idle-session-check-interval'] !== undefined)
+            params.set('idle-session-check-interval', String(node['idle-session-check-interval']));
+        if (node['idle-session-timeout'] !== undefined)
+            params.set('idle-session-timeout', String(node['idle-session-timeout']));
+        if (node['min-idle-session'] !== undefined)
+            params.set('min-idle-session', String(node['min-idle-session']));
+        if (node['max-stream-count'] !== undefined)
+            params.set('max-stream-count', String(node['max-stream-count']));
         let queryString = params.toString();
         if (queryString) queryString = '?' + queryString;
         const hash = node.name ? `#${encodeURIComponent(String(node.name))}` : '';
-        return `anytls://${node.password}@${node.server}:${node.port}${queryString}${hash}`;
+        return `anytls://${encodeURIComponent(node.password || '')}@${node.server}:${node.port}${queryString}${hash}`;
     }
 
     private naive(node: ProxyNode): string {

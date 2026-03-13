@@ -55,6 +55,13 @@ export class ShadowrocketConverter extends BaseConverter {
                 node['persistent-keepalive'] = node.keepalive;
                 node['preshared-key'] = node['preshared-key'] ?? node['pre-shared-key'];
                 node['pre-shared-key'] = node['preshared-key'];
+            } else if (node.type === 'anytls') {
+                // AnyTLS 天然启用 TLS，不需要显式输出 tls 字段
+                delete node.tls;
+                if (node.sni && !node.servername) {
+                    node.servername = node.sni;
+                    delete node.sni;
+                }
             }
 
             if (node['client-fingerprint']) {

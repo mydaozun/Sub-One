@@ -13,7 +13,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 
-import Modal from '../../../components/ui/BaseModal.vue';
+import Modal from '../../../shared/components/ui/BaseModal.vue';
 import { useToastStore } from '../../../stores/toast';
 import type { Node } from '../../../types/index';
 import { parseImportText } from '../../../utils/importer';
@@ -409,3 +409,4 @@ const importSubscription = async () => {
         </template>
     </Modal>
 </template>
+

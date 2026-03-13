@@ -101,7 +101,8 @@ export default defineConfig({
                 manualChunks: {
                     'vendor-core': ['vue', 'pinia'],
                     'vendor-utils': ['js-base64', 'js-yaml'],
-                    'vendor-ui': ['echarts', 'vuedraggable'] // 较大的 UI 库单独打包
+                    'vendor-echarts': ['echarts'],
+                    'vendor-drag': ['vuedraggable']
                 }
             }
         }

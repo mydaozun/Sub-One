@@ -46,7 +46,7 @@ export function normalizeProxyNode(proxy: ProxyNode): ProxyNode {
     // 7. TLS 默认值处理
     if (proxy.tls === undefined) {
         // 某些协议默认开启 TLS
-        if (['hysteria2', 'tuic', 'https'].includes(proxy.type)) {
+        if (['hysteria2', 'tuic', 'https', 'anytls'].includes(proxy.type)) {
             proxy.tls = true;
         } else {
             proxy.tls = false;

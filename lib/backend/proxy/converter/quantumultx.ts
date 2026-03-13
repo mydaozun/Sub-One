@@ -40,8 +40,7 @@ export class QuantumultXConverter extends BaseConverter {
                     result = this.socks5(proxy);
                     break;
                 default:
-                    console.warn(`[QXConverter] Unsupported proxy type: ${proxy.type}`);
-                    return '';
+                    throw new Error(`[QXConverter] Unsupported proxy type: ${proxy.type}`);
             }
 
             // Reality support (appended to any type that support it in QX)
@@ -129,15 +128,15 @@ export class QuantumultXConverter extends BaseConverter {
             result.append(`,obfs=over-tls`);
         }
 
-        const opts = (proxy[`${proxy.network || 'ws'}-opts`] || {}) as any;
-        if (opts) {
-            if (opts.path)
-                result.append(`,obfs-uri=${Array.isArray(opts.path) ? opts.path[0] : opts.path}`);
-            if (opts.headers?.Host)
-                result.append(
-                    `,obfs-host=${Array.isArray(opts.headers.Host) ? opts.headers.Host[0] : opts.headers.Host}`
-                );
-        }
+        // 只在 ws/http 传输时才读对应的 opts，避免 tcp 节点错误带入 ws 路径/Host
+        const netForOpts = proxy.network === 'ws' || proxy.network === 'http' ? proxy.network : null;
+        const opts = netForOpts ? (proxy[`${netForOpts}-opts`] || {}) as any : {};
+        if (opts.path)
+            result.append(`,obfs-uri=${Array.isArray(opts.path) ? opts.path[0] : opts.path}`);
+        if (opts.headers?.Host)
+            result.append(
+                `,obfs-host=${Array.isArray(opts.headers.Host) ? opts.headers.Host[0] : opts.headers.Host}`
+            );
 
         this.appendTLS(result, proxy);
         result.append(`,aead=${proxy.aead !== undefined ? proxy.aead : proxy.alterId === 0}`);
@@ -160,15 +159,15 @@ export class QuantumultXConverter extends BaseConverter {
             result.append(`,obfs=over-tls`);
         }
 
-        const opts = (proxy[`${proxy.network || 'ws'}-opts`] || {}) as any;
-        if (opts) {
-            if (opts.path)
-                result.append(`,obfs-uri=${Array.isArray(opts.path) ? opts.path[0] : opts.path}`);
-            if (opts.headers?.Host)
-                result.append(
-                    `,obfs-host=${Array.isArray(opts.headers.Host) ? opts.headers.Host[0] : opts.headers.Host}`
-                );
-        }
+        // 只在 ws/http 传输时才读对应的 opts
+        const netForVlessOpts = proxy.network === 'ws' || proxy.network === 'http' ? proxy.network : null;
+        const vlessOpts = netForVlessOpts ? (proxy[`${netForVlessOpts}-opts`] || {}) as any : {};
+        if (vlessOpts.path)
+            result.append(`,obfs-uri=${Array.isArray(vlessOpts.path) ? vlessOpts.path[0] : vlessOpts.path}`);
+        if (vlessOpts.headers?.Host)
+            result.append(
+                `,obfs-host=${Array.isArray(vlessOpts.headers.Host) ? vlessOpts.headers.Host[0] : vlessOpts.headers.Host}`
+            );
 
         this.appendTLS(result, proxy);
         if (proxy.flow) result.append(`,vless-flow=${proxy.flow}`);

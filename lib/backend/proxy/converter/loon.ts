@@ -49,6 +49,8 @@ export class LoonConverter extends BaseConverter {
                     return this.hysteria(proxy);
                 case 'hysteria2':
                     return this.hysteria2(proxy);
+                case 'anytls':
+                    return this.anytls(proxy);
                 default:
                     console.warn(`[LoonConverter] Unsupported proxy type: ${proxy.type}`);
                     return '';
@@ -133,7 +135,12 @@ export class LoonConverter extends BaseConverter {
             'skip-cert-verify'
         );
         result.appendIfPresent(`,tls-name=${proxy.sni}`, 'sni');
-        result.append(`,alterId=${proxy.aead ? 0 : proxy.alterId || 0}`);
+        // aead 字段存在时: true→alterId=0 (AEAD开启), false→alterId=1; 不存在时直接用 alterId
+        if (proxy.aead !== undefined) {
+            result.append(`,alterId=${proxy.aead ? 0 : 1}`);
+        } else {
+            result.append(`,alterId=${proxy.alterId ?? 0}`);
+        }
         this.appendCommon(result, proxy);
         return result.toString();
     }
@@ -205,7 +212,22 @@ export class LoonConverter extends BaseConverter {
             'private-key'
         );
         result.appendIfPresent(`,mtu=${proxy.mtu}`, 'mtu');
-        result.appendIfPresent(`,dns=${proxy.dns}`, 'dns');
+        // DNS: 区分 IPv4 (dns=) 和 IPv6 (dnsv6=)
+        if (proxy.dns) {
+            let dns: string | undefined;
+            let dnsv6: string | undefined;
+            if (Array.isArray(proxy.dns)) {
+                const isIPv4 = (ip: string) => /^\d+\.\d+\.\d+\.\d+$/.test(ip);
+                const isIPv6 = (ip: string) => /^[\da-fA-F:]+$/.test(ip) && ip.includes(':');
+                dnsv6 = proxy.dns.find(isIPv6);
+                dns = proxy.dns.find(isIPv4);
+                if (!dns) dns = proxy.dns.find((i: string) => !isIPv4(i) && !isIPv6(i));
+            } else {
+                dns = String(proxy.dns);
+            }
+            if (dns) result.append(`,dns=${dns}`);
+            if (dnsv6) result.append(`,dnsv6=${dnsv6}`);
+        }
         result.appendIfPresent(
             `,keepalive=${proxy.keepalive || proxy['persistent-keepalive']}`,
             'keepalive'
@@ -279,6 +301,45 @@ export class LoonConverter extends BaseConverter {
         result.append(
             `${proxy.name}=snell,${proxy.server},${proxy.port},psk="${proxy.password}",version=${proxy.version || 4}`
         );
+        return result.toString();
+    }
+
+    private anytls(proxy: ProxyNode): string {
+        const result = new Result(proxy);
+        result.append(`${proxy.name}=anytls,${proxy.server},${proxy.port},"${proxy.password}"`);
+
+        // Session 参数（只附加整数值）
+        for (const key of [
+            'idle-session-timeout',
+            'max-stream-count'
+        ] as const) {
+            if (isPresent(proxy, key) && Number.isInteger(proxy[key])) {
+                result.append(`,${key}=${proxy[key]}`);
+            }
+        }
+
+        // TLS验证
+        result.appendIfPresent(`,skip-cert-verify=${proxy['skip-cert-verify']}`, 'skip-cert-verify');
+        result.appendIfPresent(`,tls-name=${proxy.sni}`, 'sni');
+        result.appendIfPresent(`,tls-cert-sha256=${proxy['tls-fingerprint']}`, 'tls-fingerprint');
+        result.appendIfPresent(`,tls-pubkey-sha256=${proxy['tls-pubkey-sha256']}`, 'tls-pubkey-sha256');
+
+        // TFO
+        result.appendIfPresent(`,fast-open=${proxy.tfo}`, 'tfo');
+
+        // block-quic
+        if (proxy['block-quic'] === 'on') result.append(',block-quic=true');
+        else if (proxy['block-quic'] === 'off') result.append(',block-quic=false');
+
+        // UDP
+        if (proxy.udp) result.append(`,udp=true`);
+
+        // IP version
+        if (proxy['ip-version']) {
+            const val = ipVersions[proxy['ip-version']] || proxy['ip-version'];
+            result.append(`,ip-mode=${val}`);
+        }
+
         return result.toString();
     }
 
