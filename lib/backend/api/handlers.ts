@@ -4,14 +4,14 @@ import { ProxyNode, convert, parse, process } from '../proxy';
 import { AppConfig, Profile, Subscription, SubscriptionUserInfo } from '../proxy/types';
 import {
     ImportMode,
+    batchDeleteServerSnapshots,
+    createServerSnapshot,
+    deleteServerSnapshot,
     exportAllData,
     importAllData,
-    validateBackup,
-    createServerSnapshot,
     listServerSnapshots,
-    deleteServerSnapshot,
-    batchDeleteServerSnapshots,
-    restoreFromServerSnapshot
+    restoreFromServerSnapshot,
+    validateBackup
 } from '../services/backup';
 import { autoMigrate } from '../services/migration';
 import { checkAndNotify, sendTgNotification } from '../services/notification';
@@ -173,6 +173,41 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
         }
     }
 
+    if (path === '/cron/trigger') {
+        if (request.method !== 'POST' && request.method !== 'GET') {
+            return new Response('Method Not Allowed', { status: 405 });
+        }
+        try {
+            const storage = await getStorage(env);
+            const settings = (await storage.get<Partial<AppConfig>>(KV_KEY_SETTINGS)) || {};
+            
+            // 检查是否启用了定时更新
+            if (!settings.cronEnabled) {
+                return new Response(JSON.stringify({ error: '定时更新功能未启用' }), { status: 403 });
+            }
+            
+            const cronSecret = settings.cronSecret;
+
+            const urlParams = new URL(request.url).searchParams;
+            const queryToken = urlParams.get('token');
+            const authHeader = request.headers.get('Authorization');
+            let providedToken = queryToken;
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                providedToken = authHeader.substring(7);
+            }
+
+            if (!cronSecret || providedToken !== cronSecret) {
+                return new Response(JSON.stringify({ error: 'Unauthorized. Invalid cron secret.' }), { status: 401 });
+            }
+
+            const { handleCronTrigger } = await import('../cron/index');
+            return await handleCronTrigger(env);
+        } catch (e: any) {
+            console.error('[API Error /cron/trigger]', e);
+            return new Response(JSON.stringify({ error: 'Cron execute failed' }), { status: 500 });
+        }
+    }
+
     if (path === '/login') {
         if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
         try {
@@ -293,40 +328,10 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
                     );
                 }
 
-                // 步骤4: 获取设置（带错误处理）
+                // 步骤4: 获取存储服务
                 const storage = await getStorage(env);
-                let settings;
-                try {
-                    settings = (await storage.get<AppConfig>(KV_KEY_SETTINGS)) || defaultSettings;
-                } catch (settingsError) {
-                    console.error('[API Error /subs] 获取设置失败:', settingsError);
-                    settings = defaultSettings; // 使用默认设置继续
-                }
 
-                // 步骤5: 处理通知（非阻塞，错误不影响保存）
-                try {
-                    const notificationPromises = subs
-                        .filter((sub: Subscription) => sub && sub.url && sub.url.startsWith('http'))
-                        .map((sub: Subscription) =>
-                            checkAndNotify(sub, settings as AppConfig).catch((notifyError) => {
-                                console.error(
-                                    `[API Warning /subs] 通知处理失败 for ${sub.url}:`,
-                                    notifyError
-                                );
-                                // 通知失败不影响保存流程
-                            })
-                        );
-
-                    // 并行处理通知，但不等待完成
-                    Promise.all(notificationPromises).catch((e) => {
-                        console.error('[API Warning /subs] 部分通知处理失败:', e);
-                    });
-                } catch (notificationError) {
-                    console.error('[API Warning /subs] 通知系统错误:', notificationError);
-                    // 继续保存流程
-                }
-
-                // 步骤6: 保存数据到存储（使用条件写入）
+                // 步骤5: 保存数据到存储（使用条件写入）
                 try {
                     await Promise.all([
                         storage.put(KV_KEY_SUBS, subs),
@@ -627,13 +632,26 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
                         }
                         return val;
                     } else {
-                        return { id: subsToUpdate[index].id, success: false, error: 'Promise rejected' };
+                        return {
+                            id: subsToUpdate[index].id,
+                            success: false,
+                            error: 'Promise rejected'
+                        };
                     }
                 });
 
                 if (hasChanges) {
                     await storage.put(KV_KEY_SUBS, latestSubs);
                 }
+
+                // 检查到期和流量预警（非阻塞）
+                const settings =
+                    (await storage.get<Partial<AppConfig>>(KV_KEY_SETTINGS)) || defaultSettings;
+                latestSubs.forEach((sub) => {
+                    checkAndNotify(sub, settings as AppConfig).catch((err) => {
+                        console.error(`[Batch Update] 通知检查失败 for ${sub.name}:`, err);
+                    });
+                });
 
                 console.log(
                     `[Batch Update] Completed batch update, ${updateResultsArray.filter((r) => r.success).length} successful`
@@ -679,14 +697,19 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
             }
             if (request.method === 'POST') {
                 try {
-                    const newSettings = await request.json();
+                    const newSettings = (await request.json()) as any;
                     const storage = await getStorage(env);
                     const oldSettings =
                         (await storage.get<Partial<AppConfig>>(KV_KEY_SETTINGS)) || {};
+
+                    // 检查是否为静默模式（内部数据同步，不发送通知）
+                    const isSilent = newSettings._silent === true;
+                    delete newSettings._silent; // 移除内部标记
+
                     // 使用白名单机制清洗数据：只保留 defaultSettings 中存在的字段
                     // 这样即使未来删除了某个配置项，保存时也会自动剔除旧数据
                     const finalSettings: any = {};
-                    const anyNewSettings = newSettings as any;
+                    const anyNewSettings = newSettings;
 
                     for (const key of Object.keys(defaultSettings)) {
                         const k = key as string;
@@ -702,8 +725,15 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
 
                     await storage.put(KV_KEY_SETTINGS, finalSettings);
 
-                    const message = `⚙️ *Sub-One 设置更新* ⚙️\n\n您的 Sub-One 应用设置已成功更新。`;
-                    await sendTgNotification(finalSettings, message);
+                    // 只在非静默模式下发送 TG 通知（用户从设置模态框主动保存）
+                    if (!isSilent) {
+                        const message = 
+                            `┏━━━━━━━━━━━━━━━━━━━━━┓\n` +
+                            `┃   ⚙️ 设置已更新   ┃\n` +
+                            `┗━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+                            `✅ 您的 Sub-One 应用设置已成功保存并生效。`;
+                        await sendTgNotification(finalSettings, message);
+                    }
 
                     return new Response(JSON.stringify({ success: true, message: '设置已保存' }));
                 } catch (e) {
@@ -1064,7 +1094,8 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
         }
 
         case '/backup/snapshot/create': {
-            if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+            if (request.method !== 'POST')
+                return new Response('Method Not Allowed', { status: 405 });
             try {
                 const { name } = (await request.json()) as { name?: string };
                 const storage = await getStorage(env);
@@ -1083,14 +1114,19 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
             } catch (error: any) {
                 console.error('[API Error /backup/snapshot/create]', error);
                 return new Response(
-                    JSON.stringify({ success: false, error: '创建快照失败', message: error.message }),
+                    JSON.stringify({
+                        success: false,
+                        error: '创建快照失败',
+                        message: error.message
+                    }),
                     { status: 500 }
                 );
             }
         }
 
         case '/backup/snapshot/list': {
-            if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
+            if (request.method !== 'GET')
+                return new Response('Method Not Allowed', { status: 405 });
             try {
                 const storage = await getStorage(env);
                 const snapshots = await listServerSnapshots(storage);
@@ -1101,14 +1137,19 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
             } catch (error: any) {
                 console.error('[API Error /backup/snapshot/list]', error);
                 return new Response(
-                    JSON.stringify({ success: false, error: '获取快照列表失败', message: error.message }),
+                    JSON.stringify({
+                        success: false,
+                        error: '获取快照列表失败',
+                        message: error.message
+                    }),
                     { status: 500 }
                 );
             }
         }
 
         case '/backup/snapshot/batch_delete': {
-            if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+            if (request.method !== 'POST')
+                return new Response('Method Not Allowed', { status: 405 });
             try {
                 const { ids } = (await request.json()) as { ids: string[] };
                 if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -1137,10 +1178,12 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
         }
 
         case '/backup/snapshot/delete': {
-            if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+            if (request.method !== 'POST')
+                return new Response('Method Not Allowed', { status: 405 });
             try {
                 const { id } = (await request.json()) as { id: string };
-                if (!id) return new Response(JSON.stringify({ error: '缺少快照ID' }), { status: 400 });
+                if (!id)
+                    return new Response(JSON.stringify({ error: '缺少快照ID' }), { status: 400 });
 
                 const storage = await getStorage(env);
                 const success = await deleteServerSnapshot(storage, id);
@@ -1151,17 +1194,23 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
             } catch (error: any) {
                 console.error('[API Error /backup/snapshot/delete]', error);
                 return new Response(
-                    JSON.stringify({ success: false, error: '删除快照失败', message: error.message }),
+                    JSON.stringify({
+                        success: false,
+                        error: '删除快照失败',
+                        message: error.message
+                    }),
                     { status: 500 }
                 );
             }
         }
 
         case '/backup/snapshot/restore': {
-            if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+            if (request.method !== 'POST')
+                return new Response('Method Not Allowed', { status: 405 });
             try {
                 const { id, mode } = (await request.json()) as { id: string; mode?: ImportMode };
-                if (!id) return new Response(JSON.stringify({ error: '缺少快照ID' }), { status: 400 });
+                if (!id)
+                    return new Response(JSON.stringify({ error: '缺少快照ID' }), { status: 400 });
 
                 const storage = await getStorage(env);
                 const result = await restoreFromServerSnapshot(storage, id, mode || 'overwrite');
@@ -1172,7 +1221,51 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
             } catch (error: any) {
                 console.error('[API Error /backup/snapshot/restore]', error);
                 return new Response(
-                    JSON.stringify({ success: false, error: '恢复快照失败', message: error.message }),
+                    JSON.stringify({
+                        success: false,
+                        error: '恢复快照失败',
+                        message: error.message
+                    }),
+                    { status: 500 }
+                );
+            }
+        }
+        case '/notify': {
+            // POST: 发送 TG 通知（用于前端订阅管理）
+            if (request.method !== 'POST')
+                return new Response('Method Not Allowed', { status: 405 });
+            try {
+                const { message } = (await request.json()) as { message: string };
+                if (!message || typeof message !== 'string') {
+                    return new Response(
+                        JSON.stringify({ success: false, error: '缺少通知消息' }),
+                        { status: 400 }
+                    );
+                }
+
+                const storage = await getStorage(env);
+                const settings =
+                    (await storage.get<Partial<AppConfig>>(KV_KEY_SETTINGS)) || {};
+                const finalSettings = { ...defaultSettings, ...settings } as AppConfig;
+
+                // 发送 TG 通知
+                const sent = await sendTgNotification(finalSettings, message);
+
+                return new Response(
+                    JSON.stringify({
+                        success: sent,
+                        message: sent ? '通知已发送' : '通知发送失败或未配置 TG'
+                    }),
+                    { headers: { 'Content-Type': 'application/json' } }
+                );
+            } catch (error: any) {
+                console.error('[API Error /notify]', error);
+                return new Response(
+                    JSON.stringify({
+                        success: false,
+                        error: '发送通知失败',
+                        message: error.message
+                    }),
                     { status: 500 }
                 );
             }

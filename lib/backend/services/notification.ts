@@ -57,7 +57,21 @@ export async function checkAndNotify(sub: Subscription, settings: AppConfig): Pr
         if (daysRemaining <= (settings.NotifyThresholdDays || 7)) {
             // 检查上次通知时间，防止24小时内重复通知
             if (!sub.lastNotifiedExpire || now - sub.lastNotifiedExpire > ONE_DAY_MS) {
-                const message = `🗓️ *订阅临期提醒* 🗓️\n\n*订阅名称:* \`${sub.name || '未命名'}\`\n*状态:* \`${daysRemaining < 0 ? '已过期' : `仅剩 ${daysRemaining} 天到期`}\`\n*到期日期:* \`${expiryDate.toLocaleDateString('zh-CN')}\``;
+                const isExpired = daysRemaining < 0;
+                const statusIcon = isExpired ? '🔴' : '🟡';
+                const statusText = isExpired ? '已过期' : `仅剩 ${daysRemaining} 天`;
+                
+                const message = 
+                    `┏━━━━━━━━━━━━━━━━━━━━━┓\n` +
+                    `┃  🗓️ 到期提醒 ${statusIcon}  ┃\n` +
+                    `┗━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+                    `📌 *订阅名称*\n` +
+                    `\`${sub.name || '未命名'}\`\n\n` +
+                    `⏰ *到期时间*\n` +
+                    `\`${expiryDate.toLocaleDateString('zh-CN')}\`\n\n` +
+                    `📊 *当前状态*\n` +
+                    `\`${statusText}\``;
+                
                 const sent = await sendTgNotification(settings, message);
                 if (sent) {
                     sub.lastNotifiedExpire = now; // 更新通知时间戳
@@ -71,12 +85,26 @@ export async function checkAndNotify(sub: Subscription, settings: AppConfig): Pr
     if (total && total > 0 && upload !== undefined && download !== undefined) {
         const used = upload + download;
         const usagePercent = Math.round((used / total) * 100);
+        const remaining = total - used;
 
         // 检查是否满足通知条件：已用百分比 >= 阈值
         if (usagePercent >= (settings.NotifyThresholdPercent || 90)) {
             // 检查上次通知时间，防止24小时内重复通知
             if (!sub.lastNotifiedTraffic || now - sub.lastNotifiedTraffic > ONE_DAY_MS) {
-                const message = `📈 *流量预警提醒* 📈\n\n*订阅名称:* \`${sub.name || '未命名'}\`\n*状态:* \`已使用 ${usagePercent}%\`\n*详情:* \`${formatBytes(used)} / ${formatBytes(total)}\``;
+                const statusIcon = usagePercent >= 95 ? '🔴' : '🟠';
+                
+                const message = 
+                    `┏━━━━━━━━━━━━━━━━━━━━━┓\n` +
+                    `┃  � 流量预警 ${statusIcon}  ┃\n` +
+                    `┗━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+                    `📌 *订阅名称*\n` +
+                    `\`${sub.name || '未命名'}\`\n\n` +
+                    `📈 *使用情况*\n` +
+                    `已用: \`${formatBytes(used)}\`\n` +
+                    `总量: \`${formatBytes(total)}\`\n` +
+                    `剩余: \`${formatBytes(remaining)}\`\n\n` +
+                    `⚠️ *已使用 ${usagePercent}%*`;
+                
                 const sent = await sendTgNotification(settings, message);
                 if (sent) {
                     sub.lastNotifiedTraffic = now;

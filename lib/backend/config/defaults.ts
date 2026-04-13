@@ -5,7 +5,6 @@ export const defaultSettings: AppConfig = {
     mytoken: 'auto',
     profileToken: '',
 
-
     prependSubName: false,
     dedupe: false,
 
@@ -26,7 +25,11 @@ export const defaultSettings: AppConfig = {
 
     // 通知阈值
     NotifyThresholdDays: 3,
-    NotifyThresholdPercent: 90
+    NotifyThresholdPercent: 90,
+
+    // Cron 配置
+    cronEnabled: false,  // 默认关闭定时更新
+    cronSecret: ''
 };
 
 export const GLOBAL_USER_AGENT = 'Clash.Meta/v1.19.19'; // Unified UA: Mihomo v1.19.19

@@ -2,7 +2,6 @@ import { KV_KEY_PROFILES, KV_KEY_SETTINGS, KV_KEY_SUBS } from '../config/constan
 import { GLOBAL_USER_AGENT, defaultSettings } from '../config/defaults';
 import { ProxyNode, convert, parse, process } from '../proxy';
 import { AppConfig, Profile, SubConfig, Subscription } from '../proxy/types';
-import { sendTgNotification } from '../services/notification';
 import { StorageFactory } from '../services/storage';
 import { getStorageBackendInfo } from '../services/storage-backend';
 import { Env } from '../types';
@@ -107,11 +106,11 @@ async function convertViaExternalApi(
     // 很多外部 API (subconverter) 不认识 mihomo 或 stash，需要映射为标准名称
     let apiTarget = targetFormat.toLowerCase();
     const targetMapping: Record<string, string> = {
-        'mihomo': 'clash',
-        'stash': 'clash',
-        'quantumultx': 'quanx',
-        'v2ray': 'v2ray',
-        'shadowrocket': 'ss' // 某些老的 API 可能需要这一层映射，或者保持 shadowrocket
+        mihomo: 'clash',
+        stash: 'clash',
+        quantumultx: 'quanx',
+        v2ray: 'v2ray',
+        shadowrocket: 'ss' // 某些老的 API 可能需要这一层映射，或者保持 shadowrocket
     };
 
     if (targetMapping[apiTarget]) {
@@ -130,7 +129,7 @@ async function convertViaExternalApi(
 
         // 基础参数
         apiUrl.searchParams.set('target', apiTarget);
-        
+
         // 针对 Surge 的特殊处理：添加版本参数
         if (apiTarget === 'surge') {
             apiUrl.searchParams.set('ver', '4');
@@ -140,7 +139,9 @@ async function convertViaExternalApi(
         apiUrl.searchParams.set('filename', filename);
         apiUrl.searchParams.set('emoji', 'true');
 
-        console.log(`Calling external converter API: ${apiUrl.origin}${apiUrl.pathname}?target=${targetFormat}...`);
+        console.log(
+            `Calling external converter API: ${apiUrl.origin}${apiUrl.pathname}?target=${targetFormat}...`
+        );
 
         const response = await fetch(apiUrl.toString(), {
             method: 'GET',
@@ -151,7 +152,9 @@ async function convertViaExternalApi(
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`外部转换API返回错误 (${response.status}): ${errorText.substring(0, 100)}`);
+            throw new Error(
+                `外部转换API返回错误 (${response.status}): ${errorText.substring(0, 100)}`
+            );
         }
 
         return await response.text();
@@ -162,7 +165,6 @@ async function convertViaExternalApi(
         throw err;
     }
 }
-
 
 export async function handleSubRequest(
     context: EventContext<Env, string, unknown>
@@ -327,28 +329,7 @@ export async function handleSubRequest(
         targetFormat = 'base64';
     }
 
-    if (!url.searchParams.has('callback_token')) {
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'N/A';
-        const country = request.headers.get('CF-IPCountry') || 'N/A';
-        const domain = url.hostname;
-        let message = `🛰️ *订阅被访问* 🛰️\n\n*域名:* \`${domain}\`\n*客户端:* \`${userAgentHeader}\`\n*IP 地址:* \`${clientIp} (${country})\`\n*请求格式:* \`${targetFormat}\``;
-
-        if (profileIdentifier) {
-            message += `\n*订阅组:* \`${subName}\``;
-            const profile = allProfiles.find(
-                (p) =>
-                    (p.customId && p.customId === profileIdentifier) || p.id === profileIdentifier
-            );
-            if (profile && profile.expiresAt) {
-                const expiryDateStr = new Date(profile.expiresAt).toLocaleString('zh-CN', {
-                    timeZone: 'Asia/Shanghai'
-                });
-                message += `\n*到期时间:* \`${expiryDateStr}\``;
-            }
-        }
-
-        context.waitUntil(sendTgNotification(config as AppConfig, message));
-    }
+    // 注意：订阅被访问通知已移除，避免过于频繁的 TG 消息
 
     // 计算订阅组的流量统计信息（用于 HTTP 头部）
     let totalUpload = 0;
@@ -393,12 +374,12 @@ export async function handleSubRequest(
             !isSimpleTarget
         ) {
             console.log('Using external converter API (Callback Mode)');
-            
+
             // 构建一个指向当前 Sub-One 的回调链接，让外部 API 来抓取处理好的 base64 节点
             const callbackUrl = new URL(request.url);
             callbackUrl.searchParams.set('target', 'base64');
             callbackUrl.searchParams.set('_internal', 'true'); // 关键：告诉下一级请求只返回节点，不要再调外部 API
-            
+
             // 某些外部 API 需要正确的 User-Agent 才能从 Sub-One 抓取数据
             // 我们直接调用外部 API
             const finalApiUrl = config.externalConverterUrl.trim();
@@ -410,7 +391,9 @@ export async function handleSubRequest(
             );
         } else {
             // --- 内置转换模式 (或者是回调请求本身) ---
-            console.log(isInternalFetch ? 'Serving internal nodes fetch' : 'Using built-in converter');
+            console.log(
+                isInternalFetch ? 'Serving internal nodes fetch' : 'Using built-in converter'
+            );
             const combinedNodes = await generateCombinedNodeList(
                 config,
                 upstreamUserAgent,
