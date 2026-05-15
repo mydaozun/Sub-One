@@ -80,7 +80,7 @@ export function detectFormat(content: string): ContentFormat {
     // 6. URI 列表检测
     // 逻辑：包含常见协议头
     if (
-        /^(ss|ssr|vmess|vless|trojan|hysteria|hy2|tuic|wg|wireguard|socks|http|https|snell|anytls):\/\//im.test(
+        /^(ss|ssr|vmess|vless|trojan|hysteria2|hysteria|hy2|tuic|wg|wireguard|socks|http|https|snell|anytls):\/\//im.test(
             trimmed
         )
     ) {
@@ -108,15 +108,17 @@ function isPlatformFormat(str: string): boolean {
  * 判断是否可能是 Base64 编码的订阅
  */
 function isLikelyBase64(str: string): boolean {
+    // 先去除首尾空白字符
+    const trimmed = str.trim();
     // 简单的正则判断 Base64 字符集
-    if (!/^[A-Za-z0-9+/=\s]+$/.test(str)) return false;
-    if (str.length < 16) return false;
+    if (!/^[A-Za-z0-9+/=\s]+$/.test(trimmed)) return false;
+    if (trimmed.length < 16) return false;
 
     try {
-        const decoded = Base64.decode(str);
-        // 解码后应该包含协议头
-        return /^(ss|ssr|vmess|vless|trojan|hysteria|hy2|tuic|anytls|snell|wg|wireguard|socks|http|https):\/\//im.test(
-            decoded
+        const decoded = Base64.decode(trimmed);
+        // 解码后去除首尾空白，再检测是否包含协议头
+        return /^(ss|ssr|vmess|vless|trojan|hysteria2|hysteria|hy2|tuic|anytls|snell|wg|wireguard|socks|http|https):\/\//im.test(
+            decoded.trim()
         );
     } catch {
         return false;

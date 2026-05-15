@@ -51,6 +51,31 @@ ss://YWVzLTEyOC1nY206cGFzc3dvcmRAc2VydmVyOjQ0Mw#Node1-Dup
         expect(nodes[0].name).toBe('NodeB64');
     });
 
+    it('should handle Base64 encoded subscription with only hysteria2:// nodes', () => {
+        const content = [
+            'hysteria2://pass1@host1:1234?insecure=1#Hy2Node1',
+            'hysteria2://pass2@host2:4321?sni=sni.com#Hy2Node2'
+        ].join('\n');
+        const base64Data = Buffer.from(content).toString('base64');
+        const nodes = parse(base64Data);
+        expect(nodes.length).toBe(2);
+        expect(nodes[0].type).toBe('hysteria2');
+        expect(nodes[0].name).toBe('Hy2Node1');
+        expect(nodes[1].type).toBe('hysteria2');
+        expect(nodes[1].name).toBe('Hy2Node2');
+    });
+
+    it('should detect plain-text hysteria2:// URI list as uri-list format', () => {
+        const content = [
+            'hysteria2://pass1@host1:1234?insecure=1#Hy2Node1',
+            'hysteria2://pass2@host2:4321?sni=sni.com#Hy2Node2'
+        ].join('\n');
+        const nodes = parse(content);
+        expect(nodes.length).toBe(2);
+        expect(nodes[0].type).toBe('hysteria2');
+        expect(nodes[1].type).toBe('hysteria2');
+    });
+
     it('should correctly convert to Sing-box format', async () => {
         const nodes = parse('ss://YWVzLTEyOC1nY206cGFzc3dvcmRAc2VydmVyOjQ0Mw#SingboxTest');
         const singboxResult = await convert(nodes, 'singbox');
