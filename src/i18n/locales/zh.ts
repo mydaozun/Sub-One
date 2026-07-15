@@ -13,7 +13,7 @@ export default {
             },
             tg: {
                 title: 'Telegram 通知',
-                tokenPlaceholder: '从 @BotFather 获取的Bot Token',
+                tokenPlaceholder: '从 {\'@\'}BotFather 获取的Bot Token',
                 chatIdPlaceholder: '接收通知的聊天ID'
             },
             notify: {
@@ -183,6 +183,7 @@ export default {
                 desc: '每行一个订阅链接或分享节点。将自动识别节点名称。'
             },
             confirm: {
+                confirm: '确认',
                 title: '确认操作',
                 message: '您确定要执行此操作吗？',
                 
@@ -609,7 +610,7 @@ export default {
                 tg: {
                     title: 'Telegram 通知',
                     token: 'Bot Token',
-                    tokenPlaceholder: '从 @BotFather 获取的Bot Token',
+                    tokenPlaceholder: '从 {\'@\'}BotFather 获取的Bot Token',
                     chatId: 'Chat ID',
                     chatIdPlaceholder: '接收通知的聊天ID'
                 },
