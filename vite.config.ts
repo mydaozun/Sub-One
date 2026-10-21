@@ -9,10 +9,25 @@
  *
  * ======================================================
  */
+import { execSync } from 'child_process';
 import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
 import { defineConfig } from 'vite';
+
+let commitHash = '';
+try {
+    commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+} catch {
+    commitHash = (
+        process.env.CF_PAGES_COMMIT_SHA ||
+        process.env.GITHUB_SHA ||
+        process.env.COMMIT_SHA ||
+        'dev'
+    ).slice(0, 7);
+}
+
+const buildTime = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
 /**
  * Vite 配置导出
@@ -23,6 +38,10 @@ import { defineConfig } from 'vite';
  * - server: 开发服务器配置
  */
 export default defineConfig({
+    define: {
+        __BUILD_ID__: JSON.stringify(commitHash),
+        __BUILD_TIME__: JSON.stringify(buildTime)
+    },
     // ==================== 插件配置 ====================
 
     /**
@@ -74,9 +93,9 @@ export default defineConfig({
 
             /**
              * /sub 路径代理
-             * 订阅链接相关请求代理
+             * 订阅链接相关请求代理 (使用正则精准匹配，避免意外匹配前端路由如 /subscriptions)
              */
-            '/sub': {
+            '^/sub($|[/?])': {
                 target: 'http://127.0.0.1:3055', // 目标服务器地址
                 changeOrigin: true // 改变源地址，解决跨域问题
             }

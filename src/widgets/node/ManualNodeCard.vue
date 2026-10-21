@@ -80,11 +80,14 @@ const handleCopy = async (url: string) => {
                         class="animate-in fade-in zoom-in shrink-0 duration-200"
                         @click.stop
                     >
-                        <div class="relative flex h-5 w-5 items-center justify-center">
+                        <label :for="`node-select-${node.id}`" class="relative flex h-5 w-5 items-center justify-center cursor-pointer">
                             <input
+                                :id="`node-select-${node.id}`"
+                                name="nodeSelect"
                                 type="checkbox"
                                 :checked="isSelected"
                                 class="peer h-5 w-5 cursor-pointer appearance-none rounded-element border-2 border-gray-300 transition-colors checked:border-success-500 checked:bg-success-500 dark:border-white/10"
+                                aria-label="选择节点"
                                 @change="emit('toggleSelect')"
                             />
                             <svg
@@ -101,7 +104,7 @@ const handleCopy = async (url: string) => {
                                     stroke-linejoin="round"
                                 />
                             </svg>
-                        </div>
+                        </label>
                     </div>
 
                     <!-- 协议标签 (胶囊样式) -->

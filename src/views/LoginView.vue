@@ -205,6 +205,7 @@ const handleSubmit = async () => {
                         <input
                             id="username"
                             v-model="username"
+                            name="username"
                             type="text"
                             class="form-input-login bg-gray-50/50 py-2.5 text-sm transition-colors focus:bg-white sm:py-3 sm:text-base dark:bg-white/5 dark:focus:bg-white/10"
                             :class="{ 'input-error': error && !username }"
@@ -279,6 +280,7 @@ const handleSubmit = async () => {
                         <input
                             id="password"
                             v-model="password"
+                            name="password"
                             type="password"
                             class="form-input-login bg-gray-50/50 py-2.5 text-sm transition-colors focus:bg-white sm:py-3 sm:text-base dark:bg-white/5 dark:focus:bg-white/10"
                             :class="{ 'input-error': error }"
@@ -381,6 +383,7 @@ const handleSubmit = async () => {
                         <input
                             id="confirmPassword"
                             v-model="confirmPassword"
+                            name="confirmPassword"
                             type="password"
                             class="form-input-login bg-gray-50/50 py-2.5 text-sm transition-colors focus:bg-white sm:py-3 sm:text-base dark:bg-white/5 dark:focus:bg-white/10"
                             :class="{ 'input-error': error }"

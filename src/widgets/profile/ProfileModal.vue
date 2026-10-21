@@ -87,6 +87,7 @@ const { t } = useI18n();
                         <input
                             id="profile-name"
                             v-model="localProfile.name"
+                            name="profileName"
                             type="text"
                             :placeholder="t('widgets.profile.modal.namePlaceholder')"
                             class="input-modern-enhanced"
@@ -105,6 +106,7 @@ const { t } = useI18n();
                             <input
                                 id="profile-custom-id"
                                 v-model="localProfile.customId"
+                                name="profileCustomId"
                                 type="text"
                                 :placeholder="t('widgets.profile.modal.customIdPlaceholder')"
                                 class="input-modern-enhanced flex-1"
@@ -151,6 +153,7 @@ const { t } = useI18n();
                             <input
                                 id="profile-expires-at"
                                 v-model="localProfile.expiresAt"
+                                name="profileExpiresAt"
                                 type="date"
                                 class="input-modern-enhanced"
                             />
@@ -163,10 +166,10 @@ const { t } = useI18n();
 
                 <!-- 订阅组专属重命名规则 (可选) -->
                 <div>
-                    <label class="mb-2 block text-sm font-bold text-gray-700 dark:text-gray-300">
+                    <div class="mb-2 block text-sm font-bold text-gray-700 dark:text-gray-300">
                         {{ t('widgets.profile.modal.renameRules') }}
                         <span class="ml-1 text-xs font-normal text-gray-400">({{ t('widgets.profile.modal.renameRulesHint') }})</span>
-                    </label>
+                    </div>
                     <NodeRenameRuleEditor
                         v-model="localProfile.rename"
                         :placeholder="t('widgets.profile.modal.renameRulesPlaceholder')"
@@ -201,10 +204,13 @@ const { t } = useI18n();
 
                         <div class="relative mb-3">
                             <input
+                                id="subSearchTerm"
                                 v-model="subscriptionSearchTerm"
+                                name="subSearchTerm"
                                 type="text"
                                 :placeholder="t('widgets.profile.modal.searchSubPlaceholder')"
                                 class="search-input-unified"
+                                :aria-label="t('widgets.profile.modal.searchSubPlaceholder') || '搜索订阅'"
                             />
                             <svg
                                 class="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-gray-400"
@@ -228,6 +234,7 @@ const { t } = useI18n();
                             <div v-if="filteredSubscriptions.length > 0" class="space-y-1">
                                 <div v-for="sub in filteredSubscriptions" :key="sub.id">
                                     <label
+                                        :for="`sub-opt-${sub.id}`"
                                         class="group relative flex cursor-pointer items-center overflow-hidden rounded-element p-3 transition-all duration-200"
                                         :class="
                                             localProfile.subscriptions?.includes(sub.id)
@@ -240,6 +247,8 @@ const { t } = useI18n();
                                             class="absolute top-0 bottom-0 left-0 w-1 bg-linear-to-b from-primary-500 to-secondary-500"
                                         ></div>
                                         <input
+                                            :id="`sub-opt-${sub.id}`"
+                                            name="profileSubOption"
                                             type="checkbox"
                                             :checked="localProfile.subscriptions?.includes(sub.id)"
                                             class="mr-3 h-5 w-5 rounded border-gray-300 text-primary-600 transition-colors"
@@ -305,10 +314,13 @@ const { t } = useI18n();
 
                         <div class="relative mb-3">
                             <input
+                                id="profileNodeSearchTerm"
                                 v-model="nodeSearchTerm"
+                                name="profileNodeSearchTerm"
                                 type="text"
                                 :placeholder="t('widgets.profile.modal.searchNodePlaceholder')"
                                 class="search-input-unified"
+                                :aria-label="t('widgets.profile.modal.searchNodePlaceholder') || '搜索节点'"
                             />
                             <svg
                                 class="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-gray-400"
@@ -332,6 +344,7 @@ const { t } = useI18n();
                             <div v-if="filteredManualNodes.length > 0" class="space-y-1">
                                 <div v-for="node in filteredManualNodes" :key="node.id">
                                     <label
+                                        :for="`node-opt-${node.id}`"
                                         class="group relative flex cursor-pointer items-center overflow-hidden rounded-element p-3 transition-all duration-200"
                                         :class="
                                             localProfile.manualNodes?.includes(node.id)
@@ -344,6 +357,8 @@ const { t } = useI18n();
                                             class="absolute top-0 bottom-0 left-0 w-1 bg-linear-to-b from-primary-500 to-secondary-500"
                                         ></div>
                                         <input
+                                            :id="`node-opt-${node.id}`"
+                                            name="profileNodeOption"
                                             type="checkbox"
                                             :checked="localProfile.manualNodes?.includes(node.id)"
                                             class="mr-3 h-5 w-5 rounded border-gray-300 text-primary-600 transition-colors"

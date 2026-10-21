@@ -71,6 +71,7 @@ const { t } = useI18n();
                     <input
                         id="node-name"
                         v-model="localNode.name"
+                        name="nodeName"
                         type="text"
                         :placeholder="t('widgets.node.modal.namePlaceholder')"
                         class="input-modern w-full"
@@ -93,6 +94,7 @@ const { t } = useI18n();
                     <textarea
                         id="node-url"
                         v-model="localNode.url"
+                        name="nodeUrl"
                         rows="4"
                         :placeholder="t('widgets.node.modal.urlPlaceholder')"
                         class="input-modern w-full resize-none font-mono text-sm"
